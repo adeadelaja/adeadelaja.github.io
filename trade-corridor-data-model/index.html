@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trade corridor data model | Ade Adelaja</title>
+<meta name="description" content="A governed data model for cross border trade with a reusable schema.">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body id="top">
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../"><span class="name">Ade Adelaja</span><span class="role">Technical Business Analyst</span></a>
+    <nav aria-label="Main"><a href="../#work">Work</a><a href="../#about">About</a><a class="button" href="https://www.linkedin.com/in/ade-adelaja-0364aa266/">LinkedIn</a></nav>
+  </div>
+</header>
+
+<main class="wrap case">
+
+  <div class="case-title">
+    <a class="back" href="../#work">All work</a>
+    <h1>Trade corridor data model</h1>
+    <ul class="facts">
+      <li><strong>My role</strong> Technical Business Analyst</li>
+      <li><strong>Venture</strong> Hexpres, a cross border trade platform</li>
+      <li><strong>Tools</strong> Excel, pivot tables, public data from ONS and the UK Home Office</li>
+    </ul>
+  </div>
+
+  <h2>The problem</h2>
+  <p>The venture had to decide which trade corridors to enter first and show the demand behind each one. The evidence sat in separate public sources with no shared structure, so every new market meant starting the research again.</p>
+
+  <h2>What I did</h2>
+  <ol>
+    <li>Designed a data dictionary of 29 fields in two layers. Each field has a definition, a source and the model it feeds.</li>
+    <li>Pulled UK Home Office entry clearance visa data and structured 2,616 records for four corridors into the UK: Nigeria, Ghana, Kenya and South Africa.</li>
+    <li>Built a corridor flow model that rolls the raw records up by country, year and visa route, covering 1.83 million visas across four years.</li>
+    <li>Recorded migrant stock from ONS with the source dataset and the extract date beside each figure, so every number can be traced and refreshed.</li>
+    <li>Fixed the schema and issued it in an analyst brief, so the next corridor (Pakistan to UK) is built by following the same structure.</li>
+  </ol>
+
+  <h2>The work</h2>
+
+  <h3>Data dictionary</h3>
+  <figure><a href="images/01-data-dictionary.png"><img src="images/01-data-dictionary.png" alt="Data dictionary with variable, definition, source and the model each field feeds" width="2036" height="1443" loading="lazy"></a></figure>
+
+  <h3>Source and extract date on every figure</h3>
+  <figure><a href="images/02-source-and-extract-date.png"><img src="images/02-source-and-extract-date.png" alt="Migrant stock rows showing source name, source dataset and extract date" width="1673" height="132" loading="lazy"></a></figure>
+
+  <h3>Raw visa data</h3>
+  <figure><a href="images/03-raw-visa-data.png"><img src="images/03-raw-visa-data.png" alt="First rows of the 2,616 Home Office visa records" width="1663" height="686" loading="lazy"></a></figure>
+
+  <h3>Corridor flow model</h3>
+  <figure class="narrow"><a href="images/04-corridor-flow-model.png"><img src="images/04-corridor-flow-model.png" alt="Flow model by origin country, year and visa route" width="1170" height="958" loading="lazy"></a></figure>
+
+  <h3>Visas by corridor</h3>
+  <figure><a href="images/05-visas-by-corridor.png"><img src="images/05-visas-by-corridor.png" alt="Summary table and bar chart of visas by origin country" width="1678" height="560" loading="lazy"></a></figure>
+
+  <h3>Schema issued for the next corridor</h3>
+  <figure class="narrow"><a href="images/06-schema-for-new-corridors.png"><img src="images/06-schema-for-new-corridors.png" alt="Section of the analyst brief setting the two tables to follow" width="1123" height="513" loading="lazy"></a></figure>
+
+  <h2>Result</h2>
+  <p>A new corridor now starts from a fixed schema and a data refresh, not a fresh research project. The model gave the venture one place to compare corridors and one set of definitions to do it with.</p>
+
+  <h2>Skills</h2>
+  <p>Data architecture, data dictionary design, data modelling, source governance, market sizing, Excel, analyst briefing.</p>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="who">
+      <div class="name">Ade Adelaja</div>
+      <p>Technical Business Analyst. Open to roles across the UK, on site, hybrid or remote.</p>
+    </div>
+    <nav aria-label="Footer"><a href="https://www.linkedin.com/in/ade-adelaja-0364aa266/">LinkedIn</a><a href="../#work">Work</a><a href="../#about">About</a><a href="#top">Back to top</a></nav>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -5,6 +5,10 @@
 (function () {
   'use strict';
   var D = window.PORTFOLIO || PORTFOLIO;
+  /* meta.hideEmpty: true leaves out any picture whose file is missing.
+     false shows a labelled slot instead, so you can see where photos go. */
+  var HIDE_EMPTY = !!(D && D.meta && D.meta.hideEmpty);
+  var L = Object.assign({ problem: 'The ask', system: 'What I did', outcome: 'What came out of it' }, D.labels || {});
 
   /* ---------------- helpers ---------------- */
   function el(tag, cls, html) {
@@ -24,27 +28,31 @@
     return a;
   }
 
-  /* Filename forgiveness, one wired path, many accepted files.
-     "images/01-graduation-a.jpg" also finds .jpeg/.png/.webp/any case,
-     the un-numbered name, underscores, and (for -a/-1 only) the plain stem. */
+  /* Filename forgiveness: "images/hero-1.jpg" also finds .jpeg/.png/.webp, any case. */
   function candidates(src) {
     var out = [src];
     var m = src.match(/^(.*)\.([A-Za-z0-9]+)$/);
     if (!m) return out;
     var stem = m[1], exts = ['jpg','jpeg','png','webp','JPG','JPEG','PNG','WEBP'];
     var stems = [stem];
-    var lead = stem.replace(/[-_]([a1])$/, '');          /* -a / -1 falls back to plain */
+    var lead = stem.replace(/[-_]([a1])$/, '');
     if (lead !== stem) stems.push(lead);
     stems.slice().forEach(function (st) {
       var bare = st.replace(/(^|\/)\d{1,2}[-_]\s*/, '$1');
       if (stems.indexOf(bare) < 0) stems.push(bare);
-      var alt = st.replace(/(^|\/)(\d{1,2})-/, '$1$2_');
-      if (stems.indexOf(alt) < 0) stems.push(alt);
     });
     stems.forEach(function (st) {
       exts.forEach(function (e) { var c = st + '.' + e; if (out.indexOf(c) < 0) out.push(c); });
     });
     return out;
+  }
+  /* Loads an image, trying each candidate name; calls fail() if none exist. */
+  function loadImg(src, alt, fail) {
+    var img = el('img'), list = candidates(src), i = 0;
+    img.alt = alt || '';
+    img.onerror = function () { i++; if (i < list.length) { img.src = list[i]; } else if (fail) { fail(img); } };
+    img.src = list[0];
+    return img;
   }
   function slot(item) {
     var s = el('div', 'slot');
@@ -52,27 +60,52 @@
     s.appendChild(el('span', 'slot-txt', esc((item && item.alt) || 'Add an image here')));
     return s;
   }
-  function figure(item) {
+  function dropFigure(fig) {
+    var box = fig.parentNode;
+    if (!box) return;
+    box.removeChild(fig);
+    box.classList.remove('pair');
+    if (!box.querySelector('figure')) {
+      var grid = box.closest ? box.closest('.hero-grid') : null;
+      if (grid) grid.classList.add('no-photo');
+      if (box.parentNode) box.parentNode.removeChild(box);
+    }
+  }
+  function figure(item, zoomable) {
     var fig = el('figure');
+    if (item && item.fit === 'contain') fig.classList.add('fit-contain');  /* documents: show the whole page, no cropping */
     if (item && item.src) {
-      var wrap = el('div', 'fig-wrap'), img = el('img');
-      var list = candidates(item.src), i = 0;
-      img.alt = item.alt || '';
-      img.onerror = function () {
-        i++;
-        if (i < list.length) { img.src = list[i]; }
-        else if (wrap.parentNode === fig) { fig.replaceChild(slot(item), wrap); }
-      };
-      img.src = list[0];
+      var wrap = el('div', 'fig-wrap');
+      var img = loadImg(item.src, item.alt, function () {
+        if (HIDE_EMPTY) dropFigure(fig);
+        else if (wrap.parentNode === fig) fig.replaceChild(slot(item), wrap);
+      });
+      if (zoomable !== false) {
+        img.classList.add('zoomable');
+        img.addEventListener('click', function () { openBox(img.currentSrc || img.src, item.caption || item.alt); });
+      }
       wrap.appendChild(img); fig.appendChild(wrap);
-    } else { fig.appendChild(slot(item)); }
+    } else if (HIDE_EMPTY) { fig.dataset.empty = '1'; }
+    else { fig.appendChild(slot(item)); }
     if (item && item.caption) fig.appendChild(el('figcaption', null, item.caption));
     return fig;
   }
-  function section(id, num, title, build) {
+
+  /* Lightbox: click any work, journey or certificate picture to see it full size. */
+  var box = el('div', 'lightbox'), boxImg = el('img'), boxCap = el('p', 'lb-cap');
+  box.appendChild(boxImg); box.appendChild(boxCap);
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.hidden = true;
+  function openBox(src, cap) { boxImg.src = src; boxCap.innerHTML = cap || ''; box.hidden = false; document.body.classList.add('lb-open'); }
+  function closeBox() { box.hidden = true; document.body.classList.remove('lb-open'); }
+  box.addEventListener('click', closeBox);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeBox(); });
+
+  var secNo = 0;
+  function section(id, title, build) {
+    secNo++;
     var sec = el('section'); sec.id = id;
     var head = el('div', 'sec-head');
-    head.appendChild(el('span', 'n', num));
+    head.appendChild(el('span', 'n', String(secNo).padStart(2, '0')));
     head.appendChild(el('h2', 'sec', esc(title)));
     var spine = el('div', 'spine');
     spine.appendChild(head);
@@ -89,17 +122,17 @@
   var NAV = [
     { id: 'about',   label: 'About' },
     { id: 'impact',  label: 'Impact' },
-    { id: 'method',  label: 'Method' },
     { id: 'work',    label: 'Work' },
+    { id: 'ai',      label: 'AI' },
     { id: 'skills',  label: 'Skills' },
     { id: 'journey', label: 'Journey' },
     { id: 'credentials', label: 'Credentials' },
     { id: 'contact', label: 'Contact' }
-  ];
+  ].filter(function (s) { return s.id !== 'ai' || D.ai; });
   var nav = el('nav', 'nav');
   var navIn = el('div', 'nav-in');
   var mark = el('div', 'nav-mark');
-  mark.innerHTML = 'Ade Adelaja<span>.</span>';
+  mark.innerHTML = esc(m.name) + '<span>.</span>';
   navIn.appendChild(mark);
   var navLinks = el('div', 'nav-links');
   NAV.forEach(function (s) {
@@ -107,7 +140,6 @@
     navLinks.appendChild(a);
   });
   navIn.appendChild(navLinks);
-
   var btn = el('button', 'theme-btn', 'Theme');
   btn.type = 'button';
   btn.setAttribute('aria-label', 'Toggle colour theme');
@@ -124,22 +156,20 @@
 
   var page = el('div', 'page');
   root.appendChild(page);
+  root.appendChild(box);
 
   /* ======================= HERO ======================= */
   var hero = el('header', 'hero'); hero.id = 'about';
   var hg = el('div', 'hero-grid');
   var left = el('div');
-
   if (m.available) left.appendChild(el('div', 'avail', esc(m.available)));
   left.appendChild(el('p', 'label', m.eyebrow));
   left.appendChild(el('h1', null, esc(m.name)));
   left.appendChild(el('p', 'role', m.tagline));
-
   var about = el('div', 'hero-block');
   about.appendChild(el('h4', null, 'About me'));
-  about.appendChild(el('p', null, m.about));
+  (Array.isArray(m.about) ? m.about : [m.about]).forEach(function (p) { about.appendChild(el('p', null, p)); });
   left.appendChild(about);
-
   if (D.doing && D.doing.length) {
     var wd = el('div', 'hero-block');
     wd.appendChild(el('h4', null, 'What I do'));
@@ -153,26 +183,65 @@
     wd.appendChild(grid);
     left.appendChild(wd);
   }
-
   var cts = el('div', 'contact');
   if (m.email) cts.appendChild(link('mailto:' + m.email, esc(m.email), 'primary'));
   if (m.phone) cts.appendChild(link('tel:' + m.phone.replace(/\s/g, ''), esc(m.phone)));
   if (m.linkedin) cts.appendChild(link(m.linkedin, 'LinkedIn'));
   if (m.github) cts.appendChild(link(m.github, 'GitHub'));
+  if (m.caseStudies) cts.appendChild(link(m.caseStudies, 'Case studies'));
   if (m.cv) cts.appendChild(link(m.cv, 'Download CV'));
   if (m.location) cts.appendChild(el('span', null, esc(m.location)));
   left.appendChild(cts);
-
   hg.appendChild(left);
+
+  /* Hero photos rotate every few seconds. Missing files are skipped. */
   var right = el('div', 'hero-photo');
-  right.appendChild(figure(m.heroPhoto || { src: 'images/00-hero.jpg', alt: 'Ade Adelaja', caption: '' }));
+  var photos = m.heroPhotos || (m.heroPhoto ? [m.heroPhoto] : []);
+  var hfig = el('figure', 'carousel');
+  var stage = el('div', 'fig-wrap stage');
+  hfig.appendChild(stage);
+  var live = [], all = [], pending = photos.length;
+  function settle() {
+    pending--;
+    if (pending > 0) return;
+    if (!live.length) {
+      if (HIDE_EMPTY) { hg.classList.add('no-photo'); if (right.parentNode) right.parentNode.removeChild(right); }
+      else { stage.appendChild(slot({ alt: 'Hero photos go in images/hero-1.jpg, hero-2.jpg ...' })); }
+      return;
+    }
+    live.sort(function (x, y) { return all.indexOf(x) - all.indexOf(y); });  /* keep the order set in data.js */
+    live[0].classList.add('on');
+    if (live.length > 1) {
+      var dots = el('div', 'dots'), k = 0;
+      live.forEach(function (im, i) {
+        var d = el('button', i === 0 ? 'on' : null); d.type = 'button'; d.setAttribute('aria-label', 'Photo ' + (i + 1));
+        d.onclick = function () { show(i); };
+        dots.appendChild(d);
+      });
+      hfig.appendChild(dots);
+      function show(i) {
+        live[k].classList.remove('on'); dots.children[k].classList.remove('on');
+        k = i; live[k].classList.add('on'); dots.children[k].classList.add('on');
+      }
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!reduce) setInterval(function () { show((k + 1) % live.length); }, m.heroInterval || 4500);
+    }
+  }
+  photos.forEach(function (p) {
+    var img = loadImg(p.src, p.alt, function (im) { if (im.parentNode) im.parentNode.removeChild(im); settle(); });
+    img.addEventListener('load', function () { if (live.indexOf(img) < 0) { live.push(img); } settle(); }, { once: true });
+    all.push(img);
+    stage.appendChild(img);
+  });
+  if (!photos.length) { pending = 1; settle(); }
+  right.appendChild(hfig);
   hg.appendChild(right);
   hero.appendChild(hg);
   page.appendChild(hero);
 
   /* ======================= IMPACT ======================= */
   if (D.metrics && D.metrics.length) {
-    page.appendChild(section('impact', '01', D.metricsTitle || 'Measured impact', function (spine) {
+    page.appendChild(section('impact', D.metricsTitle || 'Measured impact', function (spine) {
       if (D.metricsIntro) spine.appendChild(el('p', 'lede', D.metricsIntro));
       var wrap = el('div', 'metrics');
       D.metrics.forEach(function (r) {
@@ -189,7 +258,7 @@
 
   /* ======================= METHOD ======================= */
   if (D.method) {
-    page.appendChild(section('method', '02', 'How I work', function (spine) {
+    page.appendChild(section('method', 'How I work', function (spine) {
       spine.appendChild(el('p', 'lede', D.method.intro));
       var fig = el('figure');
       var loop = el('div', 'loop');
@@ -210,9 +279,8 @@
 
   /* ======================= WORK ======================= */
   if (D.work && D.work.length) {
-    page.appendChild(section('work', '03', 'Selected work', function (spine) {
+    page.appendChild(section('work', 'Selected work', function (spine) {
       if (D.workIntro) spine.appendChild(el('p', 'lede', D.workIntro));
-
       var cards = [];
       var bar = el('div', 'filters');
       function setFilter(key, buttons) {
@@ -236,49 +304,58 @@
 
       D.work.forEach(function (w) {
         var art = el('article', 'case');
+        if (w.id) art.id = w.id;
         var head = el('div', 'case-head');
         var where = el('div', 'where');
-        where.appendChild(el('span', 'label', esc(w.org)));
-        if (w.discipline) where.appendChild(el('span', 'label disc', esc(w.discipline)));
+        where.appendChild(el('span', 'proj', esc(w.org)));
+        if (w.discipline) where.appendChild(el('span', 'disc-chip', esc(w.discipline)));
         head.appendChild(where);
+        var ctx = [w.context, w.when].filter(Boolean).join(' · ');
+        if (ctx) head.appendChild(el('span', 'ctx', esc(ctx)));
         head.appendChild(el('h3', null, esc(w.title)));
+        if (w.summary) head.appendChild(el('p', 'summary', w.summary));
         art.appendChild(head);
 
         var dl = el('dl');
         function pair(term, body, cls) {
           var d = el('div');
           d.appendChild(el('dt', null, esc(term)));
-          d.appendChild(el('dd', cls || null, body));
+          var dd = el('dd', cls || null);
+          (Array.isArray(body) ? body : [body]).forEach(function (p, i) {
+            if (typeof p === 'string') { var para = el(i === 0 && !Array.isArray(body) ? 'span' : 'p', null, p); dd.appendChild(para); }
+          });
+          d.appendChild(dd);
           dl.appendChild(d);
+          return dd;
         }
-        if (w.problem) pair('Problem', w.problem);
-        if (w.system) pair('System', w.system);
+        if (w.problem) pair(L.problem, w.problem);
+        if (w.system || w.steps) {
+          var sys = pair(L.system, w.system || []);
+          if (w.steps && w.steps.length) {
+            var ol = el('ol', 'steps');
+            w.steps.forEach(function (s) {
+              var li = el('li');
+              li.appendChild(el('b', null, esc(s.t)));
+              li.appendChild(el('span', null, s.d));
+              ol.appendChild(li);
+            });
+            sys.appendChild(ol);
+          }
+        }
         if (w.highlight) pair(w.highlight.label, w.highlight.body);
-        if (w.outcome) pair('Outcome', w.outcome, 'out');
+        if (w.outcome) pair(L.outcome, w.outcome, 'out');
         art.appendChild(dl);
 
-        if (w.code) {
-          var cw = el('div', 'code-wrap'), hdr = el('div', 'code-head');
-          hdr.appendChild(el('span', 'code-file', esc(w.code.file || '')));
-          if (w.code.lang) hdr.appendChild(el('span', 'code-lang', esc(w.code.lang)));
-          cw.appendChild(hdr);
-          var pre = el('pre'), code = el('code');
-          code.textContent = w.code.body; pre.appendChild(code); cw.appendChild(pre);
-          art.appendChild(cw);
-          if (w.code.caption) art.appendChild(el('p', 'code-cap', w.code.caption));
-        }
-        if (w.tree) {
-          var tw = el('div', 'code-wrap'), th = el('div', 'code-head');
-          th.appendChild(el('span', 'code-file', esc(w.tree.label || 'Structure')));
-          tw.appendChild(th);
-          var tp = el('pre'), tc = el('code');
-          tc.textContent = w.tree.body; tp.appendChild(tc); tw.appendChild(tp);
-          art.appendChild(tw);
-        }
         if (w.evidence && w.evidence.length) {
           var figs = el('div', 'figs');
           w.evidence.forEach(function (e) { figs.appendChild(figure(e)); });
           art.appendChild(figs);
+        }
+        if (w.caseStudy || (w.links && w.links.length)) {
+          var acts = el('div', 'actions');
+          if (w.caseStudy) acts.appendChild(link(w.caseStudy, 'Read the full case study on GitHub <span aria-hidden="true">↗</span>', 'cs-btn'));
+          (w.links || []).forEach(function (l) { acts.appendChild(link(l.href, esc(l.label) + ' <span aria-hidden="true">↗</span>', 'link-btn')); });
+          art.appendChild(acts);
         }
         if (w.stack && w.stack.length) {
           var st = el('div', 'stack');
@@ -288,12 +365,31 @@
         cards.push({ node: art, pillar: w.pillar });
         spine.appendChild(art);
       });
+      if (D.workNote) spine.appendChild(el('p', 'work-note', D.workNote));
+    }));
+  }
+
+  /* ======================= AI ======================= */
+  if (D.ai) {
+    page.appendChild(section('ai', D.ai.title || 'How I work with AI', function (spine) {
+      if (D.ai.intro) spine.appendChild(el('p', 'lede', D.ai.intro));
+      var g = el('div', 'ai-grid');
+      (D.ai.items || []).forEach(function (it, i) {
+        var c = el('div', 'ai-card');
+        c.appendChild(el('span', 'ai-n', String(i + 1).padStart(2, '0')));
+        c.appendChild(el('b', null, esc(it.title)));
+        c.appendChild(el('p', null, it.body));
+        if (it.proof) c.appendChild(el('span', 'ai-proof', it.proof));
+        g.appendChild(c);
+      });
+      spine.appendChild(g);
+      if (D.ai.note) spine.appendChild(el('p', 'ai-note', D.ai.note));
     }));
   }
 
   /* ======================= SKILLS ======================= */
   if (D.skills) {
-    page.appendChild(section('skills', '04', 'What I bring', function (spine) {
+    page.appendChild(section('skills', 'What I bring', function (spine) {
       if (D.skills.intro) spine.appendChild(el('p', 'lede', D.skills.intro));
       if (D.skills.technical) {
         var g = el('div', 'skill-grid');
@@ -334,7 +430,7 @@
 
   /* ======================= JOURNEY ======================= */
   if (D.timeline && D.timeline.length) {
-    page.appendChild(section('journey', '05', 'Built in sequence', function (spine) {
+    page.appendChild(section('journey', 'Built in sequence', function (spine) {
       if (D.timelineIntro) spine.appendChild(el('p', 'lede', D.timelineIntro));
       var tl = el('div', 'tl');
       D.timeline.forEach(function (t) {
@@ -342,10 +438,11 @@
         row.appendChild(el('div', 'tl-when', esc(t.when)));
         var what = el('div', 'tl-what');
         what.appendChild(el('strong', null, esc(t.role)));
-        what.appendChild(el('span', 'org', esc(t.org) + (t.detail ? ', ' + esc(t.detail) : '')));
+        what.appendChild(el('span', 'tl-org', esc(t.org)));
+        if (t.detail) what.appendChild(el('span', 'org', esc(t.detail)));
         var pics = t.photos || (t.photo ? [t.photo] : []);
         if (pics.length) {
-          var pw = el('div', pics.length > 1 ? 'tl-photos pair' : 'tl-photos');
+          var pw = el('div', 'tl-photos' + (pics.length > 1 ? ' strip' : ''));
           pics.forEach(function (ph) { pw.appendChild(figure(ph)); });
           what.appendChild(pw);
         }
@@ -361,15 +458,28 @@
     }));
   }
 
-  /* ======================= CREDENTIALS ======================= */
+  /* ======================= CREDENTIALS =======================
+     Hover (or tap) a credential with an image to preview the certificate;
+     click to open its verification link, or the image if there is no link. */
   if (D.credentials && D.credentials.length) {
-    page.appendChild(section('credentials', '06', 'Certifications & awards', function (spine) {
+    page.appendChild(section('credentials', 'Certifications & awards', function (spine) {
       var wrap = el('div', 'creds');
       D.credentials.forEach(function (c) {
-        var d = el('div', 'cred'), nm = el('div', 'nm');
-        if (c.url) { nm.appendChild(link(c.url, esc(c.name))); } else { nm.textContent = c.name; }
+        var d = el('div', 'cred');
+        var nm = el('div', 'nm');
+        var target = c.url || null;
+        if (target) { nm.appendChild(link(target, esc(c.name) + ' <span aria-hidden="true">↗</span>')); } else { nm.textContent = c.name; }
         d.appendChild(nm);
         d.appendChild(el('div', 'mt', esc(c.issuer) + (c.date ? ' · ' + esc(c.date) : '')));
+        if (c.img) {
+          var pv = el('div', 'cred-preview');
+          var im = loadImg(c.img, c.name, function () { if (pv.parentNode) pv.parentNode.removeChild(pv); d.classList.remove('has-img'); });
+          pv.appendChild(im);
+          d.appendChild(pv);
+          d.classList.add('has-img');
+          d.tabIndex = 0;
+          if (!target) d.addEventListener('click', function () { openBox(im.currentSrc || im.src, esc(c.name)); });
+        }
         wrap.appendChild(d);
       });
       spine.appendChild(wrap);
@@ -379,18 +489,19 @@
   /* ======================= CLOSE ======================= */
   if (D.closing) {
     var close = el('div', 'close'); close.id = 'contact';
-    var box = el('div', 'box');
-    box.appendChild(el('p', 'label', 'Open to'));
-    box.appendChild(el('h2', null, D.closing.heading));
+    var cbox = el('div', 'box');
+    cbox.appendChild(el('p', 'label', 'Open to'));
+    cbox.appendChild(el('h2', null, D.closing.heading));
     var bp = el('p', null, D.closing.body); bp.style.maxWidth = '64ch';
-    box.appendChild(bp);
+    cbox.appendChild(bp);
     var links = el('div', 'contact'); links.style.marginTop = '4px';
     if (m.email) links.appendChild(link('mailto:' + m.email, esc(m.email), 'primary'));
     if (m.phone) links.appendChild(link('tel:' + m.phone.replace(/\s/g, ''), esc(m.phone)));
     if (m.linkedin) links.appendChild(link(m.linkedin, 'LinkedIn'));
     if (m.github) links.appendChild(link(m.github, 'GitHub'));
-    box.appendChild(links);
-    close.appendChild(box);
+    if (m.caseStudies) links.appendChild(link(m.caseStudies, 'Case studies'));
+    cbox.appendChild(links);
+    close.appendChild(cbox);
     close.appendChild(el('p', 'foot', esc(m.name) + ' · ' + esc(m.location) + ' · Updated ' + esc(m.updated)));
     page.appendChild(close);
   }
@@ -399,13 +510,9 @@
   var linkFor = {};
   navLinks.querySelectorAll('a').forEach(function (a) { linkFor[a.dataset.target] = a; });
   var targets = NAV.map(function (s) { return document.getElementById(s.id); }).filter(Boolean);
-
   function spy() {
     var best = null, line = (window.innerHeight * 0.3);
-    targets.forEach(function (t) {
-      var top = t.getBoundingClientRect().top;
-      if (top <= line) best = t;
-    });
+    targets.forEach(function (t) { if (t.getBoundingClientRect().top <= line) best = t; });
     if (!best && targets.length) best = targets[0];
     Object.keys(linkFor).forEach(function (k) { linkFor[k].classList.toggle('on', best && k === best.id); });
   }
